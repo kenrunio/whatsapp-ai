@@ -1,0 +1,136 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self'; script-src 'self'" />
+    <title>WhatsApp AI — Personal Settings</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <header>
+      <img src="assets/icon.png" alt="" width="36" height="36" />
+      <div>
+        <h1>Personal Settings</h1>
+        <p class="muted" id="version"></p>
+      </div>
+    </header>
+
+    <main>
+      <section>
+        <h2>AI</h2>
+        <p class="muted">Translation and {instructions} use your own API key with Google Gemini or Anthropic Claude.</p>
+        <label>Provider
+          <select id="provider">
+            <option value="gemini">Google Gemini</option>
+            <option value="claude">Anthropic Claude</option>
+          </select>
+        </label>
+        <label>API key
+          <span class="row">
+            <input id="key" type="password" autocomplete="off" spellcheck="false" />
+            <button id="saveKey" type="button">Save key</button>
+          </span>
+        </label>
+        <p class="muted small" id="keyState"></p>
+        <label>Model
+          <span class="row">
+            <select id="model"></select>
+            <button id="test" type="button">Test</button>
+          </span>
+        </label>
+        <p class="muted small" id="modelNote">The list comes from your API key: "Recommended" follows the newest fast model it can use.</p>
+        <p id="testResult" class="result"></p>
+      </section>
+
+      <section>
+        <h2>Languages</h2>
+        <div class="grid">
+          <label>My language <select id="myLanguage"></select></label>
+          <label>The other language <select id="theirLanguage"></select></label>
+          <label>My name <input id="myName" type="text" /></label>
+          <label>In gendered languages, write me as
+            <select id="myGender">
+              <option value="">Not set (as the chat shows, else masculine)</option>
+              <option value="male">Masculine</option>
+              <option value="female">Feminine</option>
+            </select>
+          </label>
+        </div>
+      </section>
+
+      <section>
+        <h2>Google Calendar and Contacts</h2>
+        <p class="muted">For {instructions} like {two free slots next week} or {Dan's mobile number}. Read-only.</p>
+        <p id="googleState"></p>
+        <div class="row">
+          <button id="googleSignIn" type="button" class="primary">Sign in with Google</button>
+          <button id="googleSignOut" type="button">Sign out</button>
+          <button id="importGoogle" type="button">Use another client file…</button>
+        </div>
+        <p class="muted small" id="googleNote"></p>
+      </section>
+
+      <section>
+        <h2>Calendar</h2>
+        <div class="grid">
+          <label>Time zone <input id="timeZone" type="text" spellcheck="false" /></label>
+          <label>Usual meeting length (min) <input id="meetingMinutes" type="number" min="5" max="600" step="5" /></label>
+          <label>Work day starts <input id="workStart" type="time" /></label>
+          <label>Work day ends <input id="workEnd" type="time" /></label>
+          <label>Gap kept between meetings (min) <input id="gapMinutes" type="number" min="0" max="240" step="5" /></label>
+        </div>
+        <fieldset id="workDays">
+          <legend>Work days</legend>
+        </fieldset>
+      </section>
+
+      <section>
+        <h2>Files</h2>
+        <p class="muted">Folders searched for {send the Acme logo} and the like.</p>
+        <ul id="folders"></ul>
+        <button id="addFolder" type="button">Add folder…</button>
+      </section>
+
+      <section>
+        <h2>App</h2>
+        <label class="check"><input id="closeToTray" type="checkbox" /> Closing the window keeps WhatsApp AI running in the tray (notifications keep coming)</label>
+        <label class="check"><input id="startAtLogin" type="checkbox" /> Start WhatsApp AI when Windows starts</label>
+        <p class="muted small">Data folder: <code id="dataFolder"></code></p>
+      </section>
+
+      <section>
+        <h2>Keys</h2>
+        <table>
+          <tr><td><kbd>Alt</kbd>+<kbd>T</kbd></td><td>Translate: with the message box empty, the messages on screen into your language; with text in it, that text into the other language</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>E</kbd></td><td>Back to what you typed</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>A</kbd> or <kbd>Enter</kbd></td><td>Carry out the {instructions} in your message</td></tr>
+          <tr><td><kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td><td>Translate (or hide) the messages on screen, even while you are typing</td></tr>
+          <tr><td><kbd>Ctrl</kbd>+<kbd>,</kbd></td><td>These settings</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2>Windows notifications</h2>
+        <p class="muted">These work on top of WhatsApp's own notification settings (in WhatsApp: Settings › Notifications), and only on this PC: your phone isn't affected, and chats muted in WhatsApp stay muted. Messages held back still arrive and show as unread. Calls always ring.</p>
+        <div class="pair">
+          <label class="check"><input id="blockGroups" type="checkbox" /> Block all groups</label>
+          <label class="check side"><input id="allowPinnedGroups" type="checkbox" /> except pinned groups</label>
+        </div>
+        <label class="check sub"><input id="allowMentions" type="checkbox" /> but still notify when someone in a group mentions you or replies to you</label>
+        <div class="pair">
+          <label class="check"><input id="blockPersonal" type="checkbox" /> Block all personal chats</label>
+          <label class="check side"><input id="allowPinnedPersonal" type="checkbox" /> except pinned chats</label>
+        </div>
+        <h3>Always notify</h3>
+        <p class="muted small">These chats always notify, whatever is blocked above. Add a chat here by its name as WhatsApp shows it, or right-click it in WhatsApp's chat list › Always notify.</p>
+        <ul id="always"></ul>
+        <span class="row">
+          <input id="alwaysName" type="text" placeholder="Chat or group name" spellcheck="false" />
+          <button id="addAlways" type="button">Add</button>
+        </span>
+      </section>
+    </main>
+    <div id="toast" role="status"></div>
+    <script src="settings.js"></script>
+  </body>
+</html>

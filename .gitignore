@@ -1,0 +1,8 @@
+node_modules
+dist
+release/
+*.log
+# Google OAuth client file (imported in Settings, never committed)
+google-client.json
+client_secret*.json
+e2e/out/

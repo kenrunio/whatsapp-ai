@@ -1,0 +1,224 @@
+<!doctype html>
+<!-- A stand-in for WhatsApp Web with the same structure the preload reads (see src/preload/dom.ts):
+     #main, header title, message rows with data-id / .message-in / .message-out / .copyable-text,
+     and a contenteditable message box that, like WhatsApp's Lexical editor, takes pasted text and
+     files itself and sends on Enter or its send button. Like Lexical, it pastes over the selection it last heard of from
+     "selectionchange", which comes a moment after the selection changes. -->
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>WhatsApp</title>
+    <style>
+      body { margin: 0; font: 14px "Segoe UI", sans-serif; background: #efeae2; }
+      #app { display: flex; height: 100vh; }
+      #side { width: 300px; background: #fff; border-right: 1px solid #ddd; }
+      #main { flex: 1; display: flex; flex-direction: column; }
+      header { height: 64px; background: #fff; display: flex; align-items: center; padding: 0 16px; font-weight: 600; }
+      header .title { flex: 1; }
+      header .icons { display: flex; align-items: center; gap: 10px; }
+      header .icons button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: none; color: #111b21; font-size: 18px; }
+      [role="application"] { flex: 1; overflow: auto; padding: 16px 60px; }
+      .message-in, .message-out { position: relative; max-width: 65%; margin: 6px 0; padding: 6px 9px 8px; border-radius: 8px; box-shadow: 0 1px 0.5px rgba(0,0,0,.13); }
+      .message-in { background: #fff; }
+      .message-out { background: #d9fdd3; margin-left: auto; }
+      .meta { position: absolute; right: 8px; bottom: 4px; font-size: 11px; color: #667781; }
+      .copyable-text { padding-right: 50px; }
+      footer { background: #f0f2f5; padding: 8px 16px; display: flex; gap: 8px; align-items: center; }
+      footer [contenteditable] { flex: 1; }
+      footer button { width: 40px; height: 40px; border: 0; border-radius: 50%; background: #00a884; color: #fff; }
+      [contenteditable] { background: #fff; border-radius: 8px; padding: 9px 12px; min-height: 20px; outline: none; }
+      [contenteditable] p { margin: 0; }
+      #menus [role="application"] { position: fixed; top: 58px; right: 14px; background: #fff; box-shadow: 0 2px 5px rgba(0,0,0,.26); border-radius: 6px; }
+      #menus ul { list-style: none; margin: 0; padding: 8px 0; }
+      #menus li { padding: 10px 24px; cursor: pointer; display: flex; gap: 10px; align-items: center; }
+      #menus li:hover { background: #f5f6f6; }
+      #media-preview { display: none; position: fixed; inset: 60px 25%; background: #fff; border: 2px solid #00a884; padding: 20px; }
+    </style>
+  </head>
+  <body>
+    <div id="app">
+      <div id="side">
+        <div id="pane-side" aria-label="Chat list">
+          <div role="row"><div><span dir="auto" title="Dan Amir">Dan Amir</span></div><div><span title="מעולה">מעולה</span><svg viewBox="0 0 24 24" width="20" height="20"><title>ic-push-pin</title><path d="M16 9V4h1V2H7v2h1v5l-2 2v2h5v7l1 1 1-1v-7h5v-2z"/></svg></div></div>
+          <div role="row"><div><span dir="auto" title="Board">Board</span></div><div><span title="Dan: see you">Dan: see you</span><svg viewBox="0 0 24 24" width="20" height="20"><title>ic-push-pin</title><path d="M16 9V4h1V2H7v2h1v5l-2 2v2h5v7l1 1 1-1v-7h5v-2z"/></svg></div></div>
+          <div role="row"><div><span dir="auto" title="Acme IR">Acme IR</span></div><div><span title="Dan: results out">Dan: results out</span></div></div>
+          <div role="row"><div><span dir="auto" title="Yael">Yael</span></div><div><span title="ok">ok</span></div></div>
+        </div>
+      </div>
+      <div id="main">
+        <header>
+          <div class="title"><span dir="auto" title="Dan Amir">Dan Amir</span></div>
+          <div class="icons">
+            <div><button aria-label="Video call" title="Video call"><span data-icon="video-call">📹</span></button></div>
+            <div><button aria-label="Voice call" title="Voice call"><span data-icon="voice-call">📞</span></button></div>
+            <div><button aria-label="Search" title="Search"><span data-icon="search">🔍</span></button></div>
+            <div><button aria-label="Menu" title="Menu"><span data-icon="menu">⋮</span></button></div>
+          </div>
+        </header>
+        <div role="application" id="list"></div>
+        <footer>
+          <div contenteditable="true" data-lexical-editor="true" role="textbox"><p><br /></p></div>
+          <button aria-label="Send" data-tab="11"><span data-icon="wds-ic-send-filled"><svg viewBox="0 0 24 24" width="24" height="24"><title>wds-ic-send-filled</title><path d="M2 21l21-9L2 3v7l15 2-15 2z" fill="currentColor"/></svg></span></button>
+        </footer>
+      </div>
+    </div>
+    <div id="media-preview"></div>
+    <span id="menus"></span>
+    <script>
+      const list = document.getElementById("list");
+      const box = document.querySelector("[contenteditable]");
+      let n = 0;
+      const pad = (v) => String(v).padStart(2, "0");
+      const stamp = (d) => `${pad(d.getDate())}/${pad(d.getMonth() + 1)}/${d.getFullYear()}`;
+      function add(me, from, time, text, date = new Date(), atTop = false) {
+        const row = document.createElement("div");
+        row.dataset.id = `${me}_972501234567@c.us_${++n}`;
+        row.innerHTML = `<div class="${me ? "message-out" : "message-in"}"><div class="copyable-text"><div><span class="selectable-text copyable-text"><span></span></span></div></div><div class="meta">${time}</div></div>`;
+        row.querySelector(".copyable-text").dataset.prePlainText = `[${time}, ${stamp(date)}] ${from}: `;
+        row.querySelector("span span").textContent = text;
+        if (atTop) list.prepend(row);
+        else list.append(row);
+      }
+      add(false, "Dan Amir", "09:58", "היי אלכס, מה שלומך? מתי נוח לך להיפגש שבוע הבא?");
+      add(true, "Alex Stone", "10:01", "Hi Dan, all good thanks");
+      add(false, "Dan Amir", "10:03", "מעולה. תשלח לי גם את הלוגו של Acme בבקשה");
+      add(false, "Dan Amir", "10:04", "👍");
+
+      // older messages, loaded (as WhatsApp does) when the list is scrolled to the top, 10 at a time,
+      // 4 days apart: only the last 9 months are on this computer — then, like WhatsApp, a notice that
+      // older ones are only on the phone (clicking it does nothing); the chat started 15 months ago
+      const monthsAgo = (m) => {
+        const d = new Date();
+        d.setMonth(d.getMonth() - m);
+        return d;
+      };
+      const onComputer = monthsAgo(9);
+      const chatStart = monthsAgo(15);
+      const older = new Date();
+      older.setDate(older.getDate() - 1);
+      let loading = false;
+      window.__noticeClicks = 0;
+      const loadOlder = () => {
+        loading = true;
+        setTimeout(() => {
+          for (let i = 0; i < 10 && older >= chatStart && older >= onComputer; i++, older.setDate(older.getDate() - 4))
+            add(false, "Dan Amir", "09:00", `An older message, from ${stamp(older)}`, new Date(older), true);
+          loading = false;
+        }, 150);
+      };
+      list.addEventListener("scroll", () => {
+        if (list.scrollTop > 50 || loading || older < chatStart || document.getElementById("older")) return;
+        if (older >= onComputer) return loadOlder();
+        list.insertAdjacentHTML("afterbegin", '<div id="older" style="text-align:center;padding:8px"><span>Use WhatsApp on your phone to see older messages.</span></div>');
+      });
+      list.addEventListener("click", (e) => e.target.closest("#older") && window.__noticeClicks++);
+
+      // the ⋮ menu and a chat-list row's right-click menu, drawn outside the header / list like WhatsApp's
+      const menus = document.getElementById("menus");
+      const openMenu = (items) =>
+        (menus.innerHTML = `<div role="application"><ul>${items
+          .map((t) => `<li tabindex="-1" role="button" data-animate-dropdown-item="true"><svg width="20" height="20" viewBox="0 0 24 24"><title>${t.toLowerCase()}</title><circle cx="12" cy="12" r="8"/></svg><div aria-label="${t}">${t}</div>${/^Mute/.test(t) ? '<svg width="20" height="20" viewBox="0 0 24 24"><title>ic-chevron-right</title><path d="M10 6l6 6-6 6"/></svg>' : ""}</li>`)
+          .join("")}</ul></div>`);
+      document.querySelector('[aria-label="Menu"]').addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (menus.firstChild) return (menus.innerHTML = "");
+        openMenu(["Contact info", "Select messages", "Close chat"]);
+      });
+      document.getElementById("pane-side").addEventListener("contextmenu", (e) => {
+        e.preventDefault();
+        openMenu(["Archive chat", "Mute notifications", "Pin chat", "Mark as unread", "Delete chat"]);
+      });
+      document.addEventListener("click", () => (menus.innerHTML = ""));
+      document.addEventListener("keydown", (e) => e.key === "Escape" && (menus.innerHTML = ""));
+
+      // notifications, recorded instead of shown; like WhatsApp, the sound is played by the page right after
+      window.__shown = [];
+      window.Notification = class extends EventTarget {
+        static permission = "granted";
+        static requestPermission = () => Promise.resolve("granted");
+        constructor(title, o) {
+          super();
+          Object.assign(this, { title, body: o?.body ?? "", tag: o?.tag ?? "" });
+          window.__shown.push(title);
+        }
+        close() {}
+      };
+      const tone = new Audio(
+        (() => {
+          // a short silent WAV
+          const n = 800;
+          const b = new DataView(new ArrayBuffer(44 + n));
+          const str = (o, t) => [...t].forEach((c, i) => b.setUint8(o + i, c.charCodeAt(0)));
+          str(0, "RIFF"), b.setUint32(4, 36 + n, true), str(8, "WAVE"), str(12, "fmt "), b.setUint32(16, 16, true), b.setUint16(20, 1, true);
+          b.setUint16(22, 1, true), b.setUint32(24, 8000, true), b.setUint32(28, 8000, true), b.setUint16(32, 1, true), b.setUint16(34, 8, true);
+          str(36, "data"), b.setUint32(40, n, true);
+          for (let i = 0; i < n; i++) b.setUint8(44 + i, 128);
+          return URL.createObjectURL(new Blob([b], { type: "audio/wav" }));
+        })(),
+      );
+      window.__notify = (title, body, tag) =>
+        new Promise((done) => {
+          const before = window.__shown.length;
+          new Notification(title, { body, tag, silent: true });
+          setTimeout(() => {
+            tone.play().catch(() => {});
+            const sound = !tone.paused;
+            tone.pause();
+            done({ shown: window.__shown.length > before, sound });
+          }, 50);
+        });
+
+      const setText = (t) => {
+        box.innerHTML = "";
+        for (const line of t.split("\n")) {
+          const p = document.createElement("p");
+          if (line) p.textContent = line;
+          else p.append(document.createElement("br"));
+          box.append(p);
+        }
+      };
+      const text = () => [...box.querySelectorAll("p")].map((p) => p.textContent).join("\n");
+      const flat = (s) => s.replace(/\s+/g, " ").trim();
+      let selected = "";
+      document.addEventListener("selectionchange", () => {
+        const s = getSelection();
+        selected = s && box.contains(s.anchorNode) ? s.toString() : "";
+      });
+      // pastes that landed beside the old text because the editor hadn't heard of the selection yet
+      window.__stalePastes = 0;
+      box.addEventListener("paste", (e) => {
+        e.preventDefault();
+        const files = [...(e.clipboardData?.files ?? [])];
+        if (files.length) {
+          const pv = document.getElementById("media-preview");
+          pv.style.display = "block";
+          pv.textContent = files.map((f) => `${f.name} (${f.type}, ${f.size} bytes)`).join("; ");
+          return;
+        }
+        const pasted = e.clipboardData.getData("text/plain");
+        if (flat(text()) && flat(selected) !== flat(text())) {
+          window.__stalePastes++;
+          setText(text() + pasted);
+        } else setText(pasted);
+      });
+      const send = () => {
+        const t = text().trim();
+        if (t) add(true, "Alex Stone", "10:10", t);
+        setText("");
+      };
+      box.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !e.shiftKey) {
+          e.preventDefault();
+          send();
+        }
+      });
+      // like WhatsApp's, the send button sends without taking the focus from the box, and is redrawn
+      // (its class set anew, as React does) as the message changes
+      const sendButton = document.querySelector('[aria-label="Send"]');
+      sendButton.addEventListener("mousedown", (e) => e.preventDefault());
+      sendButton.addEventListener("click", send);
+      let renders = 0;
+      box.addEventListener("input", () => (sendButton.className = `send r${++renders % 2}`));
+    </script>
+  </body>
+</html>
